@@ -33,40 +33,51 @@ logger.info(f"Environment variables loaded. API Key present: {bool(api_key)}")
 if not api_key:
     raise ValueError("OpenAI API key not found in environment variables. Please check your .env file.")
 
+# Get port from environment variable
+PORT = int(os.getenv("PORT", "8000"))
+logger.info(f"Configured to run on port: {PORT}")
+
 # Initialize FastAPI app
-app = FastAPI()
+app = FastAPI(
+    title="Recipe Backend",
+    description="API for processing YouTube cooking videos into recipes",
+    version="1.0.0"
+)
 
 @app.on_event("startup")
 async def startup_event():
-    port = os.getenv("PORT")
-    logger.info(f"PORT environment variable is set to: {port}")
-    
+    logger.info(f"Starting application on port {PORT}")
     logger.info("Application startup...")
+    
+    # Test if we can write to the data directory
     try:
-        # Test OpenAI API key
+        test_file = os.path.join(DATA_DIR, 'test_write.txt')
+        with open(test_file, 'w') as f:
+            f.write('test')
+        os.remove(test_file)
+        logger.info(f"Successfully verified write access to {DATA_DIR}")
+    except Exception as e:
+        logger.error(f"Failed to write to data directory: {str(e)}")
+        
+    # Test OpenAI connection
+    try:
         logger.info("Testing OpenAI API connection...")
         client.models.list()
         logger.info("OpenAI API connection successful")
     except Exception as e:
-        logger.error(f"Error testing OpenAI API: {str(e)}")
-        # Don't raise the error, just log it
-        
-    # Create data directory if it doesn't exist
-    try:
-        os.makedirs(DATA_DIR, exist_ok=True)
-        logger.info(f"Ensured data directory exists: {DATA_DIR}")
-    except Exception as e:
-        logger.error(f"Error creating data directory: {str(e)}")
+        logger.error(f"OpenAI API connection failed: {str(e)}")
 
-@app.get("/")
+@app.get("/", status_code=200)
 async def root():
+    """Root endpoint for health checks"""
     return {
         "status": "running",
-        "port": os.getenv("PORT", "not set"),
+        "port": PORT,
         "environment": {
             "python_version": sys.version,
             "api_key_present": bool(os.getenv("OPENAI_API_KEY")),
-            "data_dir": DATA_DIR
+            "data_dir": DATA_DIR,
+            "recipes_count": len(recipes)
         }
     }
 
@@ -424,6 +435,5 @@ Transcription:
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.getenv("PORT", "8000"))
-    logger.info(f"Starting server on port {port}")
-    uvicorn.run(app, host="0.0.0.0", port=port) 
+    logger.info(f"Starting server on port {PORT}")
+    uvicorn.run(app, host="0.0.0.0", port=PORT) 
