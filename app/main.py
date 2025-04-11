@@ -46,7 +46,10 @@ app.add_middleware(
 logger.info("CORS middleware configured")
 
 # Initialize OpenAI client
-client = OpenAI()  # It will automatically use the OPENAI_API_KEY environment variable
+client = OpenAI(
+    api_key=os.getenv("OPENAI_API_KEY"),
+    base_url="https://api.openai.com/v1"
+)  # Initialize with explicit configuration
 logger.info("OpenAI client initialized")
 
 # In-memory storage for recipes
