@@ -29,19 +29,37 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 # Get port from environment variable - Railway specific handling
-PORT = None
 try:
+    # Log all environment variables for debugging
+    logger.info("Environment Variables:")
+    for key, value in os.environ.items():
+        if not key.startswith(('_', 'PATH')):  # Skip system variables
+            logger.info(f"  {key}: {value}")
+    
     port_str = os.getenv("PORT")
-    if port_str:
-        PORT = int(port_str)
-        logger.info(f"Using Railway PORT: {PORT}")
-    else:
+    logger.info(f"Raw PORT value: {port_str!r}")
+    
+    if port_str is None:
         PORT = 8000
-        logger.info(f"No PORT environment variable found, defaulting to {PORT}")
-except ValueError as e:
-    logger.error(f"Invalid PORT value: {port_str}")
+        logger.warning("No PORT environment variable found, defaulting to 8000")
+    else:
+        try:
+            PORT = int(port_str)
+            logger.info(f"Successfully set PORT to: {PORT}")
+        except ValueError:
+            logger.error(f"Invalid PORT value: {port_str!r}, defaulting to 8000")
+            PORT = 8000
+except Exception as e:
+    logger.error(f"Error during port initialization: {str(e)}")
     PORT = 8000
-    logger.info(f"Invalid PORT value, defaulting to {PORT}")
+    logger.warning("Using default port 8000 due to error")
+
+# Verify the port is in a valid range
+if not (0 < PORT < 65536):
+    logger.error(f"Port {PORT} is outside valid range (1-65535), defaulting to 8000")
+    PORT = 8000
+
+logger.info(f"Final PORT value: {PORT}")
 
 api_key = os.getenv("OPENAI_API_KEY")
 logger.info(f"Environment variables loaded. API Key present: {bool(api_key)}")
@@ -58,13 +76,30 @@ app = FastAPI(
 
 @app.on_event("startup")
 async def startup_event():
-    logger.info(f"Starting application on port {PORT}")
-    logger.info(f"Current working directory: {os.getcwd()}")
-    logger.info(f"Environment variables:")
-    logger.info(f"  PORT: {os.getenv('PORT')}")
-    logger.info(f"  RAILWAY_ENVIRONMENT: {os.getenv('RAILWAY_ENVIRONMENT')}")
-    logger.info(f"  RAILWAY_SERVICE_NAME: {os.getenv('RAILWAY_SERVICE_NAME')}")
+    logger.info("=== Application Startup Diagnostics ===")
+    logger.info(f"Python Version: {sys.version}")
+    logger.info(f"Current Working Directory: {os.getcwd()}")
+    logger.info(f"Directory Contents: {os.listdir('.')}")
     
+    # Log all environment variables
+    logger.info("Environment Variables:")
+    for key, value in os.environ.items():
+        if not key.startswith(('_', 'PATH')):  # Skip system variables
+            if 'KEY' in key.upper() or 'SECRET' in key.upper():
+                logger.info(f"  {key}: [REDACTED]")
+            else:
+                logger.info(f"  {key}: {value}")
+    
+    # Test network connectivity
+    try:
+        import socket
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind(('0.0.0.0', PORT))
+        s.close()
+        logger.info(f"Successfully bound to port {PORT}")
+    except Exception as e:
+        logger.error(f"Failed to bind to port {PORT}: {str(e)}")
+        
     # Test if we can write to the data directory
     try:
         test_file = os.path.join(DATA_DIR, 'test_write.txt')
@@ -82,6 +117,8 @@ async def startup_event():
         logger.info("OpenAI API connection successful")
     except Exception as e:
         logger.error(f"OpenAI API connection failed: {str(e)}")
+    
+    logger.info("=== End Startup Diagnostics ===")
 
 @app.get("/")
 async def root():
