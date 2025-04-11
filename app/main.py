@@ -28,14 +28,20 @@ logger = logging.getLogger(__name__)
 # Load environment variables
 load_dotenv()
 
-# Get port from environment variable
+# Get port from environment variable - Railway specific handling
+PORT = None
 try:
-    PORT = int(os.getenv("PORT", "8000"))
-    logger.info(f"PORT environment variable resolved to: {PORT}")
+    port_str = os.getenv("PORT")
+    if port_str:
+        PORT = int(port_str)
+        logger.info(f"Using Railway PORT: {PORT}")
+    else:
+        PORT = 8000
+        logger.info(f"No PORT environment variable found, defaulting to {PORT}")
 except ValueError as e:
-    logger.error(f"Invalid PORT value: {os.getenv('PORT')}")
+    logger.error(f"Invalid PORT value: {port_str}")
     PORT = 8000
-    logger.info(f"Defaulting to port {PORT}")
+    logger.info(f"Invalid PORT value, defaulting to {PORT}")
 
 api_key = os.getenv("OPENAI_API_KEY")
 logger.info(f"Environment variables loaded. API Key present: {bool(api_key)}")
@@ -54,7 +60,10 @@ app = FastAPI(
 async def startup_event():
     logger.info(f"Starting application on port {PORT}")
     logger.info(f"Current working directory: {os.getcwd()}")
-    logger.info(f"Directory contents: {os.listdir('.')}")
+    logger.info(f"Environment variables:")
+    logger.info(f"  PORT: {os.getenv('PORT')}")
+    logger.info(f"  RAILWAY_ENVIRONMENT: {os.getenv('RAILWAY_ENVIRONMENT')}")
+    logger.info(f"  RAILWAY_SERVICE_NAME: {os.getenv('RAILWAY_SERVICE_NAME')}")
     
     # Test if we can write to the data directory
     try:
@@ -448,16 +457,10 @@ Transcription:
 
 if __name__ == "__main__":
     import uvicorn
-    try:
-        port = int(os.getenv("PORT", "8000"))
-        logger.info(f"Starting server on port {port}")
-        uvicorn.run(
-            "app.main:app",
-            host="0.0.0.0",
-            port=port,
-            log_level="debug",
-            timeout_keep_alive=75
-        )
-    except Exception as e:
-        logger.error(f"Failed to start server: {str(e)}")
-        raise 
+    logger.info(f"Starting server on port {PORT}")
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=PORT,
+        log_level="info"
+    ) 
