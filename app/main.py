@@ -75,8 +75,19 @@ if not api_key:
 app = FastAPI(
     title="Recipe Backend",
     description="API for processing YouTube cooking videos into recipes",
-    version="1.0.0"
+    version="1.0.0",
+    root_path=os.getenv("RAILWAY_PUBLIC_DOMAIN", ""),
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json"
 )
+
+# Add middleware for Railway
+@app.middleware("http")
+async def add_railway_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["X-Railway-App"] = "recipe_backend"
+    return response
 
 @app.on_event("startup")
 async def startup_event():
@@ -119,6 +130,14 @@ async def startup_event():
 async def root():
     """Root endpoint for health checks"""
     try:
+        railway_info = {
+            "railway_domain": os.getenv("RAILWAY_PUBLIC_DOMAIN"),
+            "railway_private_domain": os.getenv("RAILWAY_PRIVATE_DOMAIN"),
+            "railway_environment": os.getenv("RAILWAY_ENVIRONMENT_NAME"),
+            "railway_service": os.getenv("RAILWAY_SERVICE_NAME"),
+            "railway_region": os.getenv("RAILWAY_REPLICA_REGION")
+        }
+        
         return {
             "status": "running",
             "port": PORT,
@@ -129,7 +148,9 @@ async def root():
                 "recipes_count": len(recipes),
                 "cwd": os.getcwd(),
                 "port_env": os.getenv("PORT", "not set")
-            }
+            },
+            "railway": railway_info,
+            "timestamp": datetime.now().isoformat()
         }
     except Exception as e:
         logger.error(f"Error in root endpoint: {str(e)}")
