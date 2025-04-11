@@ -28,6 +28,10 @@ logger = logging.getLogger(__name__)
 # Load environment variables
 load_dotenv()
 
+# Define data directory
+DATA_DIR = os.getenv('DATA_DIR', '/tmp')
+RECIPES_FILE = os.path.join(DATA_DIR, 'recipes.json')
+
 # Get port from environment variable - Railway specific handling
 try:
     # Log all environment variables for debugging
@@ -90,18 +94,9 @@ async def startup_event():
             else:
                 logger.info(f"  {key}: {value}")
     
-    # Test network connectivity
-    try:
-        import socket
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.bind(('0.0.0.0', PORT))
-        s.close()
-        logger.info(f"Successfully bound to port {PORT}")
-    except Exception as e:
-        logger.error(f"Failed to bind to port {PORT}: {str(e)}")
-        
     # Test if we can write to the data directory
     try:
+        os.makedirs(DATA_DIR, exist_ok=True)
         test_file = os.path.join(DATA_DIR, 'test_write.txt')
         with open(test_file, 'w') as f:
             f.write('test')
@@ -163,10 +158,6 @@ logger.info("OpenAI client initialized")
 
 # In-memory storage for recipes
 recipes: Dict[str, dict] = {}
-
-# Define data directory
-DATA_DIR = os.getenv('DATA_DIR', '/tmp')
-RECIPES_FILE = os.path.join(DATA_DIR, 'recipes.json')
 
 def save_recipe(recipe: dict):
     """Save recipe to storage."""
