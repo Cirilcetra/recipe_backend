@@ -15,6 +15,7 @@ import uuid
 from datetime import datetime
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound
 from typing import Dict, List, Optional
+import sys
 
 # Configure logging with a more detailed format
 logging.basicConfig(
@@ -37,6 +38,9 @@ app = FastAPI()
 
 @app.on_event("startup")
 async def startup_event():
+    port = os.getenv("PORT")
+    logger.info(f"PORT environment variable is set to: {port}")
+    
     logger.info("Application startup...")
     try:
         # Test OpenAI API key
@@ -53,6 +57,18 @@ async def startup_event():
         logger.info(f"Ensured data directory exists: {DATA_DIR}")
     except Exception as e:
         logger.error(f"Error creating data directory: {str(e)}")
+
+@app.get("/")
+async def root():
+    return {
+        "status": "running",
+        "port": os.getenv("PORT", "not set"),
+        "environment": {
+            "python_version": sys.version,
+            "api_key_present": bool(os.getenv("OPENAI_API_KEY")),
+            "data_dir": DATA_DIR
+        }
+    }
 
 @app.get("/health")
 async def health_check():
