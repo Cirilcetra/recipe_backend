@@ -27,17 +27,23 @@ logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
+
+# Get port from environment variable
+try:
+    PORT = int(os.getenv("PORT", "8000"))
+    logger.info(f"PORT environment variable resolved to: {PORT}")
+except ValueError as e:
+    logger.error(f"Invalid PORT value: {os.getenv('PORT')}")
+    PORT = 8000
+    logger.info(f"Defaulting to port {PORT}")
+
 api_key = os.getenv("OPENAI_API_KEY")
 logger.info(f"Environment variables loaded. API Key present: {bool(api_key)}")
 
 if not api_key:
     raise ValueError("OpenAI API key not found in environment variables. Please check your .env file.")
 
-# Get port from environment variable
-PORT = int(os.getenv("PORT", "8000"))
-logger.info(f"Configured to run on port: {PORT}")
-
-# Initialize FastAPI app
+# Initialize FastAPI app with lifespan
 app = FastAPI(
     title="Recipe Backend",
     description="API for processing YouTube cooking videos into recipes",
@@ -47,7 +53,8 @@ app = FastAPI(
 @app.on_event("startup")
 async def startup_event():
     logger.info(f"Starting application on port {PORT}")
-    logger.info("Application startup...")
+    logger.info(f"Current working directory: {os.getcwd()}")
+    logger.info(f"Directory contents: {os.listdir('.')}")
     
     # Test if we can write to the data directory
     try:
@@ -67,19 +74,25 @@ async def startup_event():
     except Exception as e:
         logger.error(f"OpenAI API connection failed: {str(e)}")
 
-@app.get("/", status_code=200)
+@app.get("/")
 async def root():
     """Root endpoint for health checks"""
-    return {
-        "status": "running",
-        "port": PORT,
-        "environment": {
-            "python_version": sys.version,
-            "api_key_present": bool(os.getenv("OPENAI_API_KEY")),
-            "data_dir": DATA_DIR,
-            "recipes_count": len(recipes)
+    try:
+        return {
+            "status": "running",
+            "port": PORT,
+            "environment": {
+                "python_version": sys.version,
+                "api_key_present": bool(os.getenv("OPENAI_API_KEY")),
+                "data_dir": DATA_DIR,
+                "recipes_count": len(recipes),
+                "cwd": os.getcwd(),
+                "port_env": os.getenv("PORT", "not set")
+            }
         }
-    }
+    except Exception as e:
+        logger.error(f"Error in root endpoint: {str(e)}")
+        return {"status": "error", "message": str(e)}
 
 @app.get("/health")
 async def health_check():
@@ -435,5 +448,16 @@ Transcription:
 
 if __name__ == "__main__":
     import uvicorn
-    logger.info(f"Starting server on port {PORT}")
-    uvicorn.run(app, host="0.0.0.0", port=PORT) 
+    try:
+        port = int(os.getenv("PORT", "8000"))
+        logger.info(f"Starting server on port {port}")
+        uvicorn.run(
+            "app.main:app",
+            host="0.0.0.0",
+            port=port,
+            log_level="debug",
+            timeout_keep_alive=75
+        )
+    except Exception as e:
+        logger.error(f"Failed to start server: {str(e)}")
+        raise 
