@@ -35,6 +35,25 @@ if not api_key:
 # Initialize FastAPI app
 app = FastAPI()
 
+@app.on_event("startup")
+async def startup_event():
+    logger.info("Application startup...")
+    try:
+        # Test OpenAI API key
+        logger.info("Testing OpenAI API connection...")
+        client.models.list()
+        logger.info("OpenAI API connection successful")
+    except Exception as e:
+        logger.error(f"Error testing OpenAI API: {str(e)}")
+        # Don't raise the error, just log it
+        
+    # Create data directory if it doesn't exist
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        logger.info(f"Ensured data directory exists: {DATA_DIR}")
+    except Exception as e:
+        logger.error(f"Error creating data directory: {str(e)}")
+
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
@@ -389,5 +408,6 @@ Transcription:
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.getenv("PORT", 8000))
-    uvicorn.run("app.main:app", host="0.0.0.0", port=port, reload=False) 
+    port = int(os.getenv("PORT", "8000"))
+    logger.info(f"Starting server on port {port}")
+    uvicorn.run(app, host="0.0.0.0", port=port) 
