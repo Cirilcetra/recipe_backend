@@ -35,6 +35,10 @@ if not api_key:
 # Initialize FastAPI app
 app = FastAPI()
 
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
@@ -55,6 +59,10 @@ logger.info("OpenAI client initialized")
 # In-memory storage for recipes
 recipes: Dict[str, dict] = {}
 
+# Define data directory
+DATA_DIR = os.getenv('DATA_DIR', '/tmp')
+RECIPES_FILE = os.path.join(DATA_DIR, 'recipes.json')
+
 def save_recipe(recipe: dict):
     """Save recipe to storage."""
     recipes[recipe['id']] = recipe
@@ -63,14 +71,15 @@ def save_recipe(recipe: dict):
 def load_recipes_from_file() -> Dict[str, dict]:
     """Load recipes from file storage."""
     try:
-        with open('recipes.json', 'r') as f:
+        with open(RECIPES_FILE, 'r') as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         return {}
 
 def save_recipes_to_file():
     """Save recipes to file storage."""
-    with open('recipes.json', 'w') as f:
+    os.makedirs(DATA_DIR, exist_ok=True)
+    with open(RECIPES_FILE, 'w') as f:
         json.dump(recipes, f)
 
 # Load existing recipes on startup
@@ -380,5 +389,5 @@ Transcription:
 
 if __name__ == "__main__":
     import uvicorn
-    logger.info("Starting FastAPI server")
-    uvicorn.run(app, host="0.0.0.0", port=8000) 
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run("app.main:app", host="0.0.0.0", port=port, reload=False) 
